@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- three.jsのcanvas要素を配置するための場所 -->
+    <div id="canvas-container"></div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/",
+          "webxr-polyfill": "https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.module.js"
+        }
+      }
+    </script>
+
+    <script type="module">
+      // three.jsの読み込み
+      import * as THREE from "three";
+      // WebVRの判定、遷移ボタンのスクリプト
+      import { VRButton } from "three/addons/webxr/VRButton.js";
+
+      // WebXRのポリフィルを読み込み
+      import WebXRPolyfill from "webxr-polyfill";
+      //コントローラ
+      import { XRControllerModelFactory } from 'https://unpkg.com/three@0.150.1/examples/jsm/webxr/XRControllerModelFactory.js';
+      import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+      import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+      //スコア変数
+      let scores=0;
+      //time
+      let times=0;
+      let time2=0;
+      let check=false;
+      let stop=false;
+      //コントローラー
+      let controller1, controller2;
+      let controllerGrip1, controllerGrip2;
+
+      // WebXRのポリフィルを有効にする
+      const polyfill = new WebXRPolyfill();
+
+      // サイズを指定
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+    
+      // レンダラーを作成
+      let renderer = new THREE.WebGLRenderer({
+        antialias: true,
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio( window.devicePixelRatio );
+
+      // レンダラーのWebVR設定を有効にする
+      console.log(renderer);
+      renderer.xr.enabled = true;
+
+      document.body.appendChild(renderer.domElement);
+
+      // WebVRの開始ボタンをDOMに追加
+      document.body.appendChild(VRButton.createButton(renderer));
+
+      // シーンを作成
+      const scene = new THREE.Scene();
+
+      // カメラを作成
+      const camera = new THREE.PerspectiveCamera(90, width / height);
+      
+
+      // カメラ用コンテナを作成
+      const cameraContainer = new THREE.Object3D();
+      cameraContainer.add(camera);
+      scene.add(cameraContainer);
+      cameraContainer.position.y = 0;
+      cameraContainer.position.z = 0;
+      //バックグラウンド背景
+      const loader = new THREE.TextureLoader();
+      const bgTexture = loader.load('background.jpg');
+      const sphereGeometry = new THREE.SphereGeometry(10, 10, 10);
+      const material = new THREE.MeshBasicMaterial({ map: bgTexture, side: THREE.BackSide });
+      const sphere = new THREE.Mesh(sphereGeometry, material);
+      scene.add(sphere);
+// スコアを表示するテキストオブジェクト
+// フォントローダー
+const fontLoader = new FontLoader();
+let textMesh1;
+// フォントを読み込む
+const font = await fontLoader.loadAsync("Rounded Mplus 1c Black_Regular.json");
+function score(){
+  if (textMesh1) {
+    scene.remove(textMesh1);
+  }
+textMesh1 = new THREE.Mesh(
+  new TextGeometry(`score:${scores}`, {
+    font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+    size: 10,   // 文字のサイズを指定
+    height: 1,  // 文字の厚さを指定
+  }),
+  new THREE.MeshBasicMaterial({
+    color: `#ccc`, // 文字の色
+  })
+);
+textMesh1.position.set(-0.5, 1.5, -1);   // Meshの位置を設定
+textMesh1.scale.set(0.01, 0.01, 0.01); // Meshの拡大縮小設定
+scores++;
+scene.add(textMesh1);
+}
+score();
+// 毎フレームごとに秒数を更新して表示
+let textMesh2;
+function Time(){
+  if (textMesh2) {
+    scene.remove(textMesh2);
+  }
+textMesh2 = new THREE.Mesh(
+  new TextGeometry(`time:${times}`, {
+    font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+    size: 10,   // 文字のサイズを指定
+    height: 1,  // 文字の厚さを指定
+  }),
+  new THREE.MeshBasicMaterial({
+    color: `#ccc`, // 文字の色
+  })
+);
+textMesh2.position.set(-0.5, 1.8, -1);   // Meshの位置を設定
+textMesh2.scale.set(0.01, 0.01, 0.01); // Meshの拡大縮小設定
+times = Math.floor(time2 / 60); // 秒数を計算
+time2++;
+scene.add(textMesh2);
+}
+let textMesh3;
+let textDisplayed = true;
+function finish(){
+textMesh3 = new THREE.Mesh(
+  new TextGeometry(`終了`, {
+    font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+    size: 10,   // 文字のサイズを指定
+    height: 1,  // 文字の厚さを指定
+  }),
+  new THREE.MeshBasicMaterial({
+    color: `red`, // 文字の色
+  })
+);
+const position1 = new THREE.Vector3(-0.3, 1.5, -0.5);
+  textMesh3.position.copy(position1);
+  textMesh3.scale.set(0.02, 0.02, 0.02); // Meshの拡大縮小設定
+  scene.add(textMesh3);
+
+  // 2つ目の位置にテキストを追加
+  const position2 = new THREE.Vector3(0, 1.5, 0.5);
+  const textMesh4 = textMesh3.clone();
+  textMesh4.position.copy(position2);
+  textMesh4.scale.set(-0.02, 0.02, 0.02); // X軸方向に反転
+  scene.add(textMesh4);
+}
+
+
+    //   光源を作成
+      {
+        const spotLight = new THREE.SpotLight(
+          0xffffff,
+          4,
+          2000,
+          Math.PI / 5,
+          0.2,
+          1.5
+        );
+        spotLight.position.set(500, 900, 500);
+        scene.add(spotLight);
+
+        const ambientLight = new THREE.AmbientLight(0x333333);
+        scene.add(ambientLight);
+      }
+     // 地面を作成
+     const gridHelper = new THREE.GridHelper(10,7,0xffffff,0xffffff);
+      scene.add(gridHelper);
+		const pg = new THREE.PlaneGeometry( 10, 10);
+		const pm = new THREE.MeshBasicMaterial( {color: 0x808080, side: THREE.DoubleSide} );
+		const plane = new THREE.Mesh(pg, pm);　plane.rotation.x =-Math.PI/2;//plane.position.y = -50;
+		scene.add( plane );
+		scene.add( new THREE.HemisphereLight( 0x888877, 0x777788 ) );
+      
+      const boxList = [];
+      // 立方体を作成
+      {
+        // 立方体のジオメトリを作成
+        const geometry = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+        // 立方体を複数作成しランダムに配置
+        const num = 20;
+        loop: for (let i = 0; i < num; i++) {
+          const px = (Math.round((Math.random() - 0.5) * 19) * 50 + 25)/100;
+          const py = (Math.round((Math.random() - 0.5) * 19) * 50 + 250)/100;
+          const pz = (Math.round((Math.random() - 0.5) * 19) *  50)/100;
+          for (let j = 0; j < i; j++) {
+            const box2 = boxList[j];
+            if (box2.position.x === px && box2.position.z === pz) {
+              i -= 1;
+              continue loop;
+            }
+          }
+          // 立方体のマテリアルを作成
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x1000000 * Math.random(),
+            roughness: 0.1,
+            metalness: 0.5,
+          });
+          const box = new THREE.Mesh(geometry, material);
+          box.position.x = px;
+          box.position.y = py;
+          box.position.z = pz;
+          scene.add(box);
+          boxList.push(box);
+        }
+      }
+
+  let time = 0;
+  
+// 毎フレーム時に実行されるループイベント
+function tick() {
+  if(stop){
+  time += 1;
+  // 立方体を動かす
+  const length = boxList.length;
+  for (let i = 0; i < length; i++) {
+    
+if (boxList[i].position.z >5) {
+  // box消滅させる
+  boxList[i].visible=false;
+  //消滅させたboxを表示
+  boxList[i].position.z = -5;
+  boxList[i].visible=true;
+} else {
+  // ランダムな動き
+  boxList[i].position.z +=0.03;
+  boxList[i].position.y =
+  (125 + 100 * Math.cos(time * 0.0005 * i*10 + i*10 / 10))/100;
+}
+}
+  }else{clearBoxes();}
+  // // レンダリング
+   renderer.render(scene, camera);
+
+   
+}
+//boxremove
+function clearBoxes() {
+  boxList.forEach((box) => {
+    box.visible = false;
+  });
+}
+  
+// リサイズ処理
+window.addEventListener("resize", onResize);
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+    
+  /* ----コントローラー設定----- */
+  
+  // コントローラーイベントの設定
+  function onSelectStart() {
+    this.userData.isSelecting = true;
+  }
+  function onSelectEnd() {
+    this.userData.isSelecting = false;
+  }	
+
+  //コントローラー取得
+  controller1 = renderer.xr.getController( 0 );
+  controller1.addEventListener( 'selectstart', onSelectStart );
+  controller1.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller1 );
+  controller2 = renderer.xr.getController( 1 );
+  controller2.addEventListener( 'selectstart', onSelectStart );
+  controller2.addEventListener( 'selectend', onSelectEnd );
+  scene.add( controller2 );
+
+  //コントローラーモデルを取得
+  const controllerModelFactory = new XRControllerModelFactory();
+  controllerGrip1 = renderer.xr.getControllerGrip(0);
+  controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+  scene.add( controllerGrip1 );
+  controllerGrip2 = renderer.xr.getControllerGrip(1);
+  controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+  scene.add( controllerGrip2 );
+// コントローラーに userData プロパティを追加して id を設定する
+controller1.userData.id = 0;
+controller2.userData.id = 1;
+  //コントローラーから出る光線の作成				
+  const geo = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, -0.6 )]);
+  const line1 = new THREE.Line( geo );
+  const line2 = new THREE.Line( geo );
+  line1.name = 'line';
+  line1.scale.z = 5;
+  line2.name = 'line';
+  line2.scale.z = 5;
+  controller1.add( line1.clone() );
+  controller2.add( line2.clone() );
+
+  //機能
+  
+  // レイキャスターを作成
+const raycaster = new THREE.Raycaster();
+
+// 光線の方向ベクトルを格納するVector3
+const rayDirection = new THREE.Vector3();
+
+// レイキャスターの原点（コントローラーの位置）を格納するVector3
+const rayOrigin = new THREE.Vector3();
+  function handleController(controller) {
+  const userData = controller.userData;
+  let hasIntersected = false; // レイキャストで交差したかを判定するフラグ
+  if (userData.isSelecting === true) {
+    if(userData.id==0){
+    line1.material.color.set(0xff0000); // 赤色に設定
+  }else{line2.material.color.set(0xff0000); }
+    check=true;
+    stop=true;
+    // コントローラーの位置をrayOriginにセット
+    rayOrigin.setFromMatrixPosition(controller.matrixWorld);
+
+    // コントローラーの前方に向けて光線を伸ばす
+    controller.getWorldDirection(rayDirection);
+    rayDirection.normalize().multiplyScalar(1);
+    rayDirection.negate(); // 光線の方向を反転する
+    raycaster.set(rayOrigin, rayDirection);
+    // 光線とboxListとの交差をチェック
+    if(stop){
+    const intersects = raycaster.intersectObjects(boxList);
+    // 交差した立方体を削除
+    if (intersects.length > 0) {
+      if (!intersects[0].object.visible) {
+      // 透明なオブジェクトには当たり判定を無視
+      return;
+    }
+
+    if (!hasIntersected) {
+      console.log("ログに出力したい文字列");
+      score();
+      hasIntersected = true; // 交差したことを記録
+    }
+    // 交差したすべての立方体を非表示にする
+    intersects.forEach((intersect) => {
+      intersect.object.visible = false;
+    });
+  } else {
+    hasIntersected = false; // 交差していない場合はフラグをリセット
+  }
+  }
+}else if(userData.id==0){
+    line1.material.color.set(0xffffff); // 赤色に設定
+  }else{line2.material.color.set(0xffffff); }
+}
+  /* ----コントローラー設定----- */
+  
+
+
+  // レンダラーにループ関数を登録
+  //renderer.setAnimationLoop(tick);
+  
+
+      function render() {
+        tick();
+  handleController( controller1 );
+		handleController( controller2 );
+    if(check){
+    if (!(times>=61)) {
+    Time();
+  }else{
+    stop=false;
+    if(textDisplayed){
+      finish();
+
+      textDisplayed=false;
+    }
+  }
+}
+}
+
+// 初回のレンダリングループの開始
+renderer.setAnimationLoop(render);
+    </script>
+  </body>
+</html>
